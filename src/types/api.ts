@@ -14,6 +14,11 @@ export interface ApiErrorResponse {
   };
 }
 
-export function ok<T>(data: T, meta?: Record<string, unknown>): ApiSuccessResponse<T> {
-  return meta ? { success: true, data, meta } : { success: true, data };
+export function ok<T>(
+  data: T,
+  meta?: Record<string, unknown> | object,
+): ApiSuccessResponse<T> {
+  return meta
+    ? { success: true, data, meta: meta as Record<string, unknown> }
+    : { success: true, data };
 }

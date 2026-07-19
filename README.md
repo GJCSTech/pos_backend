@@ -2,7 +2,7 @@
 
 Centralized **Node.js 22 / Express / PostgreSQL 16 / Prisma** API for the VJ Garden Boutique offline-first POS platform.
 
-Version **0.1.0** establishes the multi-tenant foundation (Company → Branch → User / Role / Permission / Device) and authentication required for future SQLite ↔ PostgreSQL synchronization.
+Version **0.2.0** delivers the enterprise business core (catalog, parties, inventory, purchases, sales, payments, settings) on top of the **0.1.0** multi-tenant foundation. SQLite ↔ PostgreSQL sync remains planned for a later release.
 
 ## Stack
 
@@ -83,7 +83,7 @@ cp .env.example .env
 
 ```bash
 npm install
-npx prisma migrate dev --name init_foundation
+npx prisma migrate deploy
 npm run db:seed
 ```
 
@@ -104,7 +104,9 @@ npm run dev
 
 **Never** ship these defaults to production. Rotate JWT secrets and admin password before go-live.
 
-## API surface (0.1.0)
+## API surface (0.2.0)
+
+Foundation (unchanged from 0.1.0):
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -116,6 +118,19 @@ npm run dev
 | `POST` | `/api/v1/devices/register` | Bearer + `device.register` | Register POS device |
 | `GET` | `/api/v1/devices` | Bearer + `device.view` | List devices |
 | `GET` | `/api/v1/devices/:id` | Bearer + `device.view` | Device detail |
+
+Business core (CRUD + workflows; see Swagger for full query params):
+
+| Area | Base paths |
+|------|------------|
+| Catalog | `/product-categories`, `/product-attributes`, `/units`, `/tax-masters`, `/products`, `/product-variants` |
+| Parties | `/suppliers`, `/customers`, `/customer-groups` |
+| Inventory | `/inventories`, `/inventories/value`, `/inventories/low-stock`, `/inventories/adjust`, `/stock-movements`, `/opening-stocks` |
+| Purchases | `/purchases`, `/purchases/:id/receive`, `/purchase-returns`, `/purchase-returns/:id/complete` |
+| Sales | `/sales`, `/sales/:id/complete`, `/hold-bills`, `/hold-bills/:id/resume`, `/payments` |
+| Settings | `/business-settings`, `/receipt-settings` |
+
+List endpoints support `page`, `pageSize`, `search`, `sortBy`, `sortOrder`, and often `branchId` / `isActive`.
 
 ### Login example
 

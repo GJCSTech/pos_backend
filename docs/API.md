@@ -1,4 +1,4 @@
-# API Reference — 0.1.0
+# API Reference — 0.2.0
 
 Base path: `/api/v1`  
 Interactive docs: `/docs`  
@@ -9,7 +9,7 @@ OpenAPI JSON: `/docs.json`
 Success:
 
 ```json
-{ "success": true, "data": {} }
+{ "success": true, "data": {}, "meta": { "page": 1, "pageSize": 20, "total": 0, "totalPages": 0 } }
 ```
 
 Error:
@@ -25,48 +25,29 @@ Error:
 }
 ```
 
-## Auth
+## Auth & devices
 
-### Login
+Unchanged from 0.1.0 — see `/docs` tags **Auth** and **Devices**.
 
-`POST /auth/login`
+## Business modules
 
-```json
-{
-  "usernameOrEmail": "admin",
-  "password": "ChangeMeAdmin!2026",
-  "companyCode": "VJGARDEN"
-}
-```
+All business routes require `Authorization: Bearer <accessToken>` and the matching permission (`*.view` / `*.manage`).
 
-### Refresh
+| Module | Permission prefix | Notes |
+|--------|-------------------|-------|
+| Catalog | `catalog.*` | Categories, attributes, units, taxes, products, variants |
+| Suppliers | `supplier.*` | Supplier CRUD |
+| Customers | `customer.*` | Customers + groups |
+| Inventory | `inventory.*` | Stock, movements, opening stock, valuation |
+| Purchases | `purchase.*` | Purchases, receive, returns |
+| Sales | `sales.*` | Sales, hold bills, payments |
+| Settings | `settings.*` | Business + receipt settings |
 
-`POST /auth/refresh`
+### Notable workflows
 
-```json
-{ "refreshToken": "..." }
-```
+- `POST /purchases` then `POST /purchases/:id/receive` → stock IN + supplier outstanding
+- `POST /opening-stocks` then `POST /opening-stocks/:id/post` → opening movement
+- `POST /sales` with `payments[]` and `status=COMPLETED` → stock OUT + split tender
+- `POST /hold-bills` → held sale; `POST /hold-bills/:id/resume` with payments → complete
 
-### Logout
-
-`POST /auth/logout` — same body as refresh; idempotent.
-
-## Devices
-
-### Register
-
-`POST /devices/register` — requires `device.register`
-
-```json
-{
-  "deviceUuid": "11111111-1111-4111-8111-111111111111",
-  "platform": "ANDROID",
-  "deviceName": "Counter Tablet 1",
-  "appVersion": "0.22.0"
-}
-```
-
-### List / Get
-
-`GET /devices?branchId=` — requires `device.view`  
-`GET /devices/:id` — requires `device.view`
+Full request/response schemas: open Swagger at `/docs`.

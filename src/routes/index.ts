@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate';
 import { asyncHandler } from '../utils/asyncHandler';
 import { loginSchema, refreshTokenSchema } from '../validators/auth.schemas';
 import { registerDeviceSchema } from '../validators/device.schemas';
+import { registerBusinessRoutes } from './business';
 
 export function createRoutes(container: AppContainer): Router {
   const router = Router();
@@ -196,6 +197,8 @@ export function createRoutes(container: AppContainer): Router {
     requirePermissions('device.view'),
     asyncHandler(deviceController.getById),
   );
+
+  registerBusinessRoutes(router, container);
 
   return router;
 }

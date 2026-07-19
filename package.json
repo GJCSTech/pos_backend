@@ -1,7 +1,7 @@
 {
   "name": "@vj-garden/pos-backend",
-  "version": "0.1.0",
-  "description": "VJ Garden POS Backend — centralized PostgreSQL sync API for offline-first SQLite devices",
+  "version": "0.2.0",
+  "description": "VJ Garden POS Backend — enterprise business core + foundation for offline-first SQLite sync",
   "private": true,
   "license": "UNLICENSED",
   "author": "GJCSTech",

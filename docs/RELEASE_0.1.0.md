@@ -17,8 +17,6 @@
 
 See [../README.md](../README.md).
 
-## Next (planned)
+## Next
 
-- Sync protocol (push/pull, conflict resolution)
-- Business entity replication (products, sales, inventory)
-- Mobile sync client integration
+Delivered in [RELEASE_0.2.0.md](./RELEASE_0.2.0.md) (Enterprise Business Core). Sync protocol remains planned.
