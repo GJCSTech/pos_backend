@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: vj-garden-pos-api-dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://vjgarden:vjgarden_secret@postgres:5432/vj_garden_pos?schema=public
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./logs:/app/logs
+    command: sh -c "npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx watch src/index.ts"
