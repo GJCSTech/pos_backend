@@ -1,9 +1,10 @@
 import type { Prisma, PrismaClient, StockMovement } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { StockMovementListQuery } from '../validators/stockMovement.schemas';
 
@@ -35,6 +36,7 @@ export class StockMovementRepository implements IStockMovementRepository {
     const where: Prisma.StockMovementWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.productId ? { productId: query.productId } : {}),
       ...(query.movementType ? { movementType: query.movementType } : {}),

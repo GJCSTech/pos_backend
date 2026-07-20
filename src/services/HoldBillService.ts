@@ -44,9 +44,9 @@ export class HoldBillService {
         throw validationError('Either saleId or sale payload is required');
       }
       const saleInput: CreateSaleInput = {
-        ...(input.sale as CreateSaleInput),
+        ...input.sale!,
         status: 'HELD',
-        customerId: customerId ?? (input.sale as CreateSaleInput).customerId ?? null,
+        customerId: customerId ?? input.sale?.customerId ?? null,
       };
       const sale = await this.saleService.create(user, saleInput);
       saleId = sale.id;

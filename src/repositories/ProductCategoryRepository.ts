@@ -1,9 +1,10 @@
 import type { ProductCategory, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateProductCategoryInput, UpdateProductCategoryInput, ProductCategoryListQuery } from '../validators/productCategory.schemas';
 
@@ -48,6 +49,7 @@ export class ProductCategoryRepository implements IProductCategoryRepository {
     const where: Prisma.ProductCategoryWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

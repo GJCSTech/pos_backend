@@ -1,7 +1,7 @@
 {
   "name": "@vj-garden/pos-backend",
-  "version": "0.2.0",
-  "description": "VJ Garden POS Backend — enterprise business core + foundation for offline-first SQLite sync",
+  "version": "0.2.1",
+  "description": "VJ Garden POS Backend — hardened enterprise core ready for React Native POS integration",
   "private": true,
   "license": "UNLICENSED",
   "author": "GJCSTech",

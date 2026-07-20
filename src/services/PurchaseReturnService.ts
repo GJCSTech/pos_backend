@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { conflict, notFound } from '../errors/AppError';
+import { conflict, notFound, validationError } from '../errors/AppError';
 import type { IPurchaseReturnRepository } from '../repositories/PurchaseReturnRepository';
 import type { InventoryService } from './InventoryService';
 import type { AuthUser } from '../types/auth';
@@ -106,6 +106,7 @@ export class PurchaseReturnService {
       });
 
       if (status === 'COMPLETED') {
+        await this.assertReturnQuantities(tx, user.companyId, input.purchaseId, input.items);
         await this.applyReturnStock(tx, user, purchaseReturn.id, input.items);
         await tx.supplier.update({
           where: { id: purchase.supplierId },
@@ -158,6 +159,7 @@ export class PurchaseReturnService {
       if (existing.status !== 'COMPLETED' && nextStatus === 'COMPLETED') {
         const items = (summary?.items ??
           (existing.items as PurchaseReturnItemInput[])) as PurchaseReturnItemInput[];
+        await this.assertReturnQuantities(tx, user.companyId, existing.purchaseId, items);
         await this.applyReturnStock(tx, user, purchaseReturn.id, items);
         await tx.supplier.update({
           where: { id: purchaseReturn.purchase.supplierId },
@@ -186,6 +188,68 @@ export class PurchaseReturnService {
       throw conflict('Completed purchase returns cannot be deleted');
     }
     return this.returns.softDelete(id, user.id);
+  }
+
+  private async assertReturnQuantities(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    purchaseId: string,
+    items: PurchaseReturnItemInput[],
+  ): Promise<void> {
+    const purchaseItems = await tx.purchaseItem.findMany({
+      where: { purchaseId, companyId, deletedAt: null },
+    });
+
+    const purchasedByKey = new Map<string, Prisma.Decimal>();
+    for (const row of purchaseItems) {
+      const key = `${row.productId}|${row.variantId ?? ''}`;
+      purchasedByKey.set(
+        key,
+        (purchasedByKey.get(key) ?? new Prisma.Decimal(0)).add(row.quantity),
+      );
+    }
+
+    const priorReturns = await tx.purchaseReturn.findMany({
+      where: {
+        companyId,
+        purchaseId,
+        status: 'COMPLETED',
+        deletedAt: null,
+      },
+      select: { items: true },
+    });
+
+    const returnedByKey = new Map<string, Prisma.Decimal>();
+    for (const prior of priorReturns) {
+      const priorItems = prior.items as unknown as PurchaseReturnItemInput[];
+      if (!Array.isArray(priorItems)) continue;
+      for (const item of priorItems) {
+        const key = `${item.productId}|${item.variantId ?? ''}`;
+        returnedByKey.set(
+          key,
+          (returnedByKey.get(key) ?? new Prisma.Decimal(0)).add(Math.abs(item.quantity)),
+        );
+      }
+    }
+
+    for (const item of items) {
+      const key = `${item.productId}|${item.variantId ?? ''}`;
+      const purchased = purchasedByKey.get(key) ?? new Prisma.Decimal(0);
+      const alreadyReturned = returnedByKey.get(key) ?? new Prisma.Decimal(0);
+      const remaining = purchased.sub(alreadyReturned);
+      const requested = new Prisma.Decimal(Math.abs(item.quantity));
+      if (requested.gt(remaining)) {
+        throw validationError(
+          `Return quantity for product ${item.productId} exceeds remaining returnable quantity`,
+          {
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            requested: Number(requested),
+            remaining: Number(remaining),
+          },
+        );
+      }
+    }
   }
 
   private async applyReturnStock(

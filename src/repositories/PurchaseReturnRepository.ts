@@ -1,9 +1,10 @@
 import type { Prisma, PrismaClient, PurchaseReturn } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { PurchaseReturnListQuery } from '../validators/purchaseReturn.schemas';
 
@@ -56,6 +57,7 @@ export class PurchaseReturnRepository implements IPurchaseReturnRepository {
     const where: Prisma.PurchaseReturnWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.purchaseId ? { purchaseId: query.purchaseId } : {}),
       ...(query.status ? { status: query.status } : {}),

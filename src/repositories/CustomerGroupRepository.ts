@@ -1,9 +1,10 @@
 import type { CustomerGroup, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateCustomerGroupInput, UpdateCustomerGroupInput, CustomerGroupListQuery } from '../validators/customerGroup.schemas';
 
@@ -48,6 +49,7 @@ export class CustomerGroupRepository implements ICustomerGroupRepository {
     const where: Prisma.CustomerGroupWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

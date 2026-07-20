@@ -1,9 +1,10 @@
 import type { OpeningStock, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { OpeningStockListQuery } from '../validators/openingStock.schemas';
 
@@ -42,6 +43,7 @@ export class OpeningStockRepository implements IOpeningStockRepository {
     const where: Prisma.OpeningStockWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.productId ? { productId: query.productId } : {}),
       ...(query.isPosted === undefined ? {} : { isPosted: query.isPosted }),

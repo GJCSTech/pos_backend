@@ -1,24 +1,48 @@
 export interface ApiSuccessResponse<T> {
   success: true;
+  message: string;
   data: T;
   meta?: Record<string, unknown>;
 }
 
+export interface ApiErrorBody {
+  code: string;
+  details?: unknown;
+  requestId?: string;
+}
+
 export interface ApiErrorResponse {
   success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-    requestId?: string;
-  };
+  message: string;
+  errors: ApiErrorBody;
 }
 
 export function ok<T>(
   data: T,
-  meta?: Record<string, unknown> | object,
+  metaOrMessage?: Record<string, unknown> | object | string,
+  message = 'Success',
 ): ApiSuccessResponse<T> {
-  return meta
-    ? { success: true, data, meta: meta as Record<string, unknown> }
-    : { success: true, data };
+  if (typeof metaOrMessage === 'string') {
+    return { success: true, message: metaOrMessage, data };
+  }
+
+  return metaOrMessage
+    ? {
+        success: true,
+        message,
+        data,
+        meta: metaOrMessage as Record<string, unknown>,
+      }
+    : { success: true, message, data };
+}
+
+export function fail(
+  message: string,
+  errors: ApiErrorBody,
+): ApiErrorResponse {
+  return {
+    success: false,
+    message,
+    errors,
+  };
 }

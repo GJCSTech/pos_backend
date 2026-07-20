@@ -1,9 +1,10 @@
 import type { ProductAttribute, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateProductAttributeInput, UpdateProductAttributeInput, ProductAttributeListQuery } from '../validators/productAttribute.schemas';
 
@@ -48,6 +49,7 @@ export class ProductAttributeRepository implements IProductAttributeRepository {
     const where: Prisma.ProductAttributeWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

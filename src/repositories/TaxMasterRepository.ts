@@ -1,9 +1,10 @@
 import type { TaxMaster, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateTaxMasterInput, UpdateTaxMasterInput, TaxMasterListQuery } from '../validators/taxMaster.schemas';
 
@@ -48,6 +49,7 @@ export class TaxMasterRepository implements ITaxMasterRepository {
     const where: Prisma.TaxMasterWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

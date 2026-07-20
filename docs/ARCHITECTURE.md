@@ -1,8 +1,14 @@
-# Backend Architecture — Release 0.2.0
+# Backend Architecture — Release 0.2.1
 
 ## Goals
 
-Provide a production-ready centralized API for offline-first POS devices. Release **0.1.0** delivered tenant identity, RBAC, and device registry. Release **0.2.0** adds the enterprise business core (catalog, inventory, purchase, sales, settings). Sync engine remains a future release.
+Provide a production-ready centralized API for offline-first POS devices.
+
+- **0.1.0** — tenant identity, RBAC, device registry
+- **0.2.0** — enterprise business core (catalog, inventory, purchase, sales, settings)
+- **0.2.1** — API hardening, consistent contracts, validation, Swagger completeness, mobile list/sync readiness
+
+Sync engine remains a future release.
 
 ## Layers
 
@@ -26,26 +32,46 @@ Company
         └── Purchases / Sales / Settings
 ```
 
-All business rows carry `companyId` / `branchId` for multi-company / multi-branch readiness.
+All business rows carry `companyId` / `branchId`. List filters accept optional `branchId` (defaults to the authenticated user's branch).
 
 ## Auth flow
 
-1. `POST /auth/login` verifies password (bcrypt), issues JWT access + opaque-style refresh JWT.
+1. `POST /auth/login` verifies password (bcrypt), issues JWT access + refresh JWT.
 2. Refresh token hash (SHA-256) stored in `refresh_tokens`.
 3. `POST /auth/refresh` rotates refresh token (revoke previous).
-4. Protected routes require `Authorization: Bearer <access>` and permission checks.
+4. Protected routes require `Authorization: Bearer <access>` and permission checks (`requirePermissions` + service-level `assertPermission`).
 
-## Business patterns (0.2.0)
+## API contract (0.2.1)
+
+```
+Success → { success: true, message, data, meta? }
+Failure → { success: false, message, errors: { code, details?, requestId? } }
+```
+
+Cross-cutting middleware: Helmet, CORS, compression, rate limiting, request IDs, Zod validation (body/query/params), centralized error mapping (including Prisma + JSON parse).
+
+## Business patterns
 
 - Repository pattern + service layer + Zod validators
-- Pagination / search / sort via shared `listQuerySchema`
+- Pagination / search / sort / date sync filters via shared `listQuerySchema`
 - Soft delete (`deletedAt`) + `version` increments on mutation
-- Inventory mutations run inside Prisma transactions
-- Purchase receive / sale complete apply stock movements and recalculate averages
+- Inventory mutations run inside Prisma transactions with optimistic concurrency on qty updates
+- Purchase receive / sale complete / purchase return complete apply stock movements
 
 ## Sync readiness
 
-- UUID primary keys align with mobile `uuid` sync identity.
-- `version` column for optimistic concurrency.
-- `deletedAt` soft deletes for tombstone propagation.
-- Device registry tracks `lastSyncAt` for future sync sessions.
+- UUID primary keys align with mobile sync identity
+- `version` column for optimistic concurrency
+- `deletedAt` soft deletes for tombstone propagation
+- `updatedSince` list filter + `(companyId, updatedAt)` indexes for incremental pulls
+- Device registry tracks `lastSyncAt` for future sync sessions
+
+## Intentional non-CRUD surfaces
+
+| Area | Pattern |
+|------|---------|
+| Inventory | Adjust / movements / opening post (not generic CRUD) |
+| Hold bills | Create / resume / cancel |
+| Payments | Create / soft-delete (refund path) |
+| Receipt settings | Singleton upsert per branch |
+| Users / Roles / Permissions | Seeded; exposed via `/auth/me` |

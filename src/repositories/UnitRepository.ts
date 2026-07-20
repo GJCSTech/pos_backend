@@ -1,9 +1,10 @@
 import type { Unit, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateUnitInput, UpdateUnitInput, UnitListQuery } from '../validators/unit.schemas';
 
@@ -48,6 +49,7 @@ export class UnitRepository implements IUnitRepository {
     const where: Prisma.UnitWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

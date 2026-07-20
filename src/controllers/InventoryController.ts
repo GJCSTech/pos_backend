@@ -30,14 +30,15 @@ export class InventoryController {
     const branchId =
       typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
     const result = await this.service.getInventoryValue(req.user, branchId);
-    res.status(200).json(ok(result));
+    res.status(200).json(ok({ valuation: result }, 'Inventory valuation calculated'));
   };
 
   lowStock = async (req: Request, res: Response): Promise<void> => {
     if (!req.user) throw unauthorized();
-    const branchId =
-      typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
-    const inventories = await this.service.listLowStock(req.user, branchId);
-    res.status(200).json(ok({ inventories }));
+    const result = await this.service.listLowStock(
+      req.user,
+      req.query as unknown as InventoryListQuery,
+    );
+    res.status(200).json(ok({ inventories: result.items }, result.meta));
   };
 }

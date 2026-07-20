@@ -4,6 +4,7 @@ import type { IProductRepository } from '../repositories/ProductRepository';
 import type { AuthUser } from '../types/auth';
 import {
   buildPageMeta,
+  listDateFilters,
   resolveOrderBy,
   toSkipTake,
   type PaginatedResult,
@@ -28,6 +29,7 @@ export class ProductService {
       ...(query.supplierId ? { supplierId: query.supplierId } : {}),
       ...(query.barcode ? { barcode: query.barcode } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
+      ...listDateFilters(query),
       ...(query.search
         ? {
             OR: [

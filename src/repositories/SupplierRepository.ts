@@ -1,9 +1,10 @@
 import type { Supplier, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateSupplierInput, UpdateSupplierInput, SupplierListQuery } from '../validators/supplier.schemas';
 
@@ -48,6 +49,7 @@ export class SupplierRepository implements ISupplierRepository {
     const where: Prisma.SupplierWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

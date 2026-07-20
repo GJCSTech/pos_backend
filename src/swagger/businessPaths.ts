@@ -1,5 +1,25 @@
 type PathItem = Record<string, unknown>;
 
+const listParams = [
+  { $ref: '#/components/parameters/Page' },
+  { $ref: '#/components/parameters/PageSize' },
+  { $ref: '#/components/parameters/Search' },
+  { $ref: '#/components/parameters/SortBy' },
+  { $ref: '#/components/parameters/SortOrder' },
+  { $ref: '#/components/parameters/BranchId' },
+  { $ref: '#/components/parameters/UpdatedSince' },
+  { $ref: '#/components/parameters/CreatedFrom' },
+  { $ref: '#/components/parameters/CreatedTo' },
+];
+
+const standardErrors = {
+  400: { $ref: '#/components/responses/ValidationError' },
+  401: { $ref: '#/components/responses/Unauthorized' },
+  403: { $ref: '#/components/responses/Forbidden' },
+  404: { $ref: '#/components/responses/NotFound' },
+  409: { $ref: '#/components/responses/Conflict' },
+};
+
 function crudPaths(
   basePath: string,
   tag: string,
@@ -13,24 +33,25 @@ function crudPaths(
       get: {
         tags: [tag],
         summary: `List ${singular}s`,
+        description: `Paginated list of ${singular}s with search, sort, branch, and sync date filters.`,
         security: [{ bearerAuth: [] }],
-        parameters: [
-          { $ref: '#/components/parameters/Page' },
-          { $ref: '#/components/parameters/PageSize' },
-          { $ref: '#/components/parameters/Search' },
-          { $ref: '#/components/parameters/SortBy' },
-          { $ref: '#/components/parameters/SortOrder' },
-          { $ref: '#/components/parameters/BranchId' },
-        ],
+        parameters: listParams,
         responses: {
-          200: { description: `${singular} list` },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Forbidden' },
+          200: {
+            description: `${singular} list`,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiSuccess' },
+              },
+            },
+          },
+          ...standardErrors,
         },
       },
       post: {
         tags: [tag],
         summary: `Create ${singular}`,
+        description: `Create a new ${singular}.`,
         security: [{ bearerAuth: [] }],
         requestBody: createRef
           ? {
@@ -46,10 +67,15 @@ function crudPaths(
               content: { 'application/json': { schema: { type: 'object' } } },
             },
         responses: {
-          201: { description: `${singular} created` },
-          400: { description: 'Validation error' },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Forbidden' },
+          201: {
+            description: `${singular} created`,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiSuccess' },
+              },
+            },
+          },
+          ...standardErrors,
         },
       },
     },
@@ -57,36 +83,63 @@ function crudPaths(
       get: {
         tags: [tag],
         summary: `Get ${singular} by id`,
+        description: `Fetch a single ${singular} by UUID.`,
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/IdPath' }],
         responses: {
-          200: { description: `${singular} found` },
-          404: { description: 'Not found' },
+          200: {
+            description: `${singular} found`,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiSuccess' },
+              },
+            },
+          },
+          ...standardErrors,
         },
       },
       patch: {
         tags: [tag],
         summary: `Update ${singular}`,
+        description: `Partial update of a ${singular}.`,
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/IdPath' }],
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { type: 'object' } } },
+          content: {
+            'application/json': {
+              schema: createRef ? { $ref: createRef } : { type: 'object' },
+            },
+          },
         },
         responses: {
-          200: { description: `${singular} updated` },
-          404: { description: 'Not found' },
+          200: {
+            description: `${singular} updated`,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiSuccess' },
+              },
+            },
+          },
+          ...standardErrors,
         },
       },
       delete: {
         tags: [tag],
         summary: `Soft-delete ${singular}`,
+        description: `Soft-deletes the ${singular} (sets deletedAt). Returns the deleted resource in the success envelope.`,
         security: [{ bearerAuth: [] }],
         parameters: [{ $ref: '#/components/parameters/IdPath' }],
         responses: {
-          200: { description: `${singular} deleted` },
-          204: { description: `${singular} deleted` },
-          404: { description: 'Not found' },
+          200: {
+            description: `${singular} deleted`,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ApiSuccess' },
+              },
+            },
+          },
+          ...standardErrors,
         },
       },
     },
@@ -114,32 +167,50 @@ export const businessPaths: Record<string, PathItem> = {
     get: {
       tags: ['Inventory'],
       summary: 'List inventory rows',
+      description: 'Paginated on-hand stock with product/variant includes.',
       security: [{ bearerAuth: [] }],
-      parameters: [
-        { $ref: '#/components/parameters/Page' },
-        { $ref: '#/components/parameters/PageSize' },
-        { $ref: '#/components/parameters/Search' },
-        { $ref: '#/components/parameters/BranchId' },
-      ],
-      responses: { 200: { description: 'Inventory list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Inventory list' }, ...standardErrors },
     },
   },
   '/inventories/value': {
     get: {
       tags: ['Inventory'],
       summary: 'Calculate inventory value',
+      description: 'Returns branch inventory valuation (qty × averageCost).',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/BranchId' }],
-      responses: { 200: { description: 'Inventory valuation' } },
+      responses: {
+        200: {
+          description: 'Inventory valuation',
+          content: {
+            'application/json': {
+              example: {
+                success: true,
+                message: 'Inventory valuation calculated',
+                data: {
+                  valuation: {
+                    branchId: '33333333-3333-4333-8333-333333333333',
+                    inventoryValue: 15000.5,
+                  },
+                },
+              },
+            },
+          },
+        },
+        ...standardErrors,
+      },
     },
   },
   '/inventories/low-stock': {
     get: {
       tags: ['Inventory'],
       summary: 'List low-stock inventory',
+      description:
+        'Paginated rows where quantity <= reorderLevel (or minimumStock when reorderLevel is 0).',
       security: [{ bearerAuth: [] }],
-      parameters: [{ $ref: '#/components/parameters/BranchId' }],
-      responses: { 200: { description: 'Low stock list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Low stock list' }, ...standardErrors },
     },
   },
   '/inventories/{id}': {
@@ -148,13 +219,43 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get inventory by id',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Inventory found' }, 404: { description: 'Not found' } },
+      responses: { 200: { description: 'Inventory found' }, ...standardErrors },
     },
   },
   '/inventories/adjust': {
     post: {
       tags: ['Inventory'],
       summary: 'Adjust stock quantity',
+      description: 'Applies a signed stock adjustment inside a transaction.',
+      security: [{ bearerAuth: [] }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/AdjustStockRequest' },
+            example: {
+              productId: '11111111-1111-4111-8111-111111111111',
+              quantity: -2,
+              notes: 'Damaged stock',
+            },
+          },
+        },
+      },
+      responses: { 200: { description: 'Stock adjusted' }, ...standardErrors },
+    },
+  },
+  '/stock-movements': {
+    get: {
+      tags: ['Inventory'],
+      summary: 'List stock movements',
+      security: [{ bearerAuth: [] }],
+      parameters: listParams,
+      responses: { 200: { description: 'Movement list' }, ...standardErrors },
+    },
+    post: {
+      tags: ['Inventory'],
+      summary: 'Create stock movement (adjustment)',
+      description: 'Creates an adjustment movement and returns updated inventory.',
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -164,21 +265,7 @@ export const businessPaths: Record<string, PathItem> = {
           },
         },
       },
-      responses: { 200: { description: 'Stock adjusted' } },
-    },
-  },
-  '/stock-movements': {
-    get: {
-      tags: ['Inventory'],
-      summary: 'List stock movements',
-      security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Movement list' } },
-    },
-    post: {
-      tags: ['Inventory'],
-      summary: 'Create stock movement (adjustment)',
-      security: [{ bearerAuth: [] }],
-      responses: { 201: { description: 'Movement applied' } },
+      responses: { 201: { description: 'Movement applied' }, ...standardErrors },
     },
   },
   '/stock-movements/{id}': {
@@ -187,7 +274,7 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get stock movement',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Movement found' } },
+      responses: { 200: { description: 'Movement found' }, ...standardErrors },
     },
   },
   '/opening-stocks': {
@@ -195,13 +282,14 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Inventory'],
       summary: 'List opening stocks',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Opening stock list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Opening stock list' }, ...standardErrors },
     },
     post: {
       tags: ['Inventory'],
       summary: 'Create opening stock',
       security: [{ bearerAuth: [] }],
-      responses: { 201: { description: 'Opening stock created' } },
+      responses: { 201: { description: 'Opening stock created' }, ...standardErrors },
     },
   },
   '/opening-stocks/{id}': {
@@ -210,23 +298,24 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get opening stock',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Opening stock found' } },
+      responses: { 200: { description: 'Opening stock found' }, ...standardErrors },
     },
     delete: {
       tags: ['Inventory'],
       summary: 'Delete unposted opening stock',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
   '/opening-stocks/{id}/post': {
     post: {
       tags: ['Inventory'],
       summary: 'Post opening stock to inventory',
+      description: 'Posts opening stock as OPENING movement and updates on-hand qty.',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Posted' } },
+      responses: { 200: { description: 'Posted' }, ...standardErrors },
     },
   },
   '/purchases': {
@@ -234,7 +323,23 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Purchases'],
       summary: 'List purchases',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Purchase list' } },
+      parameters: [
+        ...listParams,
+        {
+          in: 'query',
+          name: 'supplierId',
+          schema: { type: 'string', format: 'uuid' },
+        },
+        {
+          in: 'query',
+          name: 'status',
+          schema: {
+            type: 'string',
+            enum: ['DRAFT', 'ORDERED', 'PARTIAL', 'RECEIVED', 'CANCELLED'],
+          },
+        },
+      ],
+      responses: { 200: { description: 'Purchase list' }, ...standardErrors },
     },
     post: {
       tags: ['Purchases'],
@@ -248,7 +353,7 @@ export const businessPaths: Record<string, PathItem> = {
           },
         },
       },
-      responses: { 201: { description: 'Purchase created' } },
+      responses: { 201: { description: 'Purchase created' }, ...standardErrors },
     },
   },
   '/purchases/{id}': {
@@ -257,30 +362,32 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get purchase',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Purchase found' } },
+      responses: { 200: { description: 'Purchase found' }, ...standardErrors },
     },
     patch: {
       tags: ['Purchases'],
       summary: 'Update purchase',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Updated' } },
+      responses: { 200: { description: 'Updated' }, ...standardErrors },
     },
     delete: {
       tags: ['Purchases'],
       summary: 'Cancel/soft-delete purchase',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
   '/purchases/{id}/receive': {
     post: {
       tags: ['Purchases'],
       summary: 'Mark purchase received and update stock',
+      description:
+        'Receives purchase lines into inventory (PURCHASE movements) and updates supplier outstanding balance.',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Received' } },
+      responses: { 200: { description: 'Received' }, ...standardErrors },
     },
   },
   '/purchase-returns': {
@@ -288,13 +395,16 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Purchases'],
       summary: 'List purchase returns',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Return list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Return list' }, ...standardErrors },
     },
     post: {
       tags: ['Purchases'],
       summary: 'Create purchase return',
+      description:
+        'Creates a purchase return. Completing validates return qty against remaining returnable quantity.',
       security: [{ bearerAuth: [] }],
-      responses: { 201: { description: 'Return created' } },
+      responses: { 201: { description: 'Return created' }, ...standardErrors },
     },
   },
   '/purchase-returns/{id}': {
@@ -303,21 +413,21 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get purchase return',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Return found' } },
+      responses: { 200: { description: 'Return found' }, ...standardErrors },
     },
     patch: {
       tags: ['Purchases'],
       summary: 'Update purchase return',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Updated' } },
+      responses: { 200: { description: 'Updated' }, ...standardErrors },
     },
     delete: {
       tags: ['Purchases'],
       summary: 'Cancel purchase return',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
   '/purchase-returns/{id}/complete': {
@@ -326,7 +436,7 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Complete purchase return and reduce stock',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Completed' } },
+      responses: { 200: { description: 'Completed' }, ...standardErrors },
     },
   },
   '/sales': {
@@ -334,11 +444,29 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Sales'],
       summary: 'List sales',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Sale list' } },
+      parameters: [
+        ...listParams,
+        {
+          in: 'query',
+          name: 'customerId',
+          schema: { type: 'string', format: 'uuid' },
+        },
+        {
+          in: 'query',
+          name: 'status',
+          schema: {
+            type: 'string',
+            enum: ['DRAFT', 'HELD', 'COMPLETED', 'CANCELLED', 'RETURNED'],
+          },
+        },
+      ],
+      responses: { 200: { description: 'Sale list' }, ...standardErrors },
     },
     post: {
       tags: ['Sales'],
       summary: 'Create sale with items and optional split payments',
+      description:
+        'Create a sale. When status=COMPLETED, payments[] is required and stock is deducted.',
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -348,7 +476,7 @@ export const businessPaths: Record<string, PathItem> = {
           },
         },
       },
-      responses: { 201: { description: 'Sale created' } },
+      responses: { 201: { description: 'Sale created' }, ...standardErrors },
     },
   },
   '/sales/{id}': {
@@ -357,21 +485,21 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get sale',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Sale found' } },
+      responses: { 200: { description: 'Sale found' }, ...standardErrors },
     },
     patch: {
       tags: ['Sales'],
       summary: 'Update sale',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Updated' } },
+      responses: { 200: { description: 'Updated' }, ...standardErrors },
     },
     delete: {
       tags: ['Sales'],
       summary: 'Cancel sale',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
   '/sales/{id}/complete': {
@@ -380,7 +508,14 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Complete sale with payments and deduct stock',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Completed' } },
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ResumeHoldBillRequest' },
+          },
+        },
+      },
+      responses: { 200: { description: 'Completed' }, ...standardErrors },
     },
   },
   '/hold-bills': {
@@ -388,13 +523,22 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Sales'],
       summary: 'List hold bills',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Hold bill list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Hold bill list' }, ...standardErrors },
     },
     post: {
       tags: ['Sales'],
       summary: 'Create hold bill',
       security: [{ bearerAuth: [] }],
-      responses: { 201: { description: 'Hold bill created' } },
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/CreateHoldBillRequest' },
+          },
+        },
+      },
+      responses: { 201: { description: 'Hold bill created' }, ...standardErrors },
     },
   },
   '/hold-bills/{id}': {
@@ -403,16 +547,39 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get hold bill',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Hold bill found' } },
+      responses: { 200: { description: 'Hold bill found' }, ...standardErrors },
     },
   },
   '/hold-bills/{id}/resume': {
     post: {
       tags: ['Sales'],
       summary: 'Resume hold bill into completed sale',
+      description: 'Completes the linked sale with payments and closes the hold bill.',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Resumed' } },
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ResumeHoldBillRequest' },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: 'Resumed',
+          content: {
+            'application/json': {
+              example: {
+                success: true,
+                message: 'Hold bill resumed',
+                data: { holdBill: {}, sale: {} },
+              },
+            },
+          },
+        },
+        ...standardErrors,
+      },
     },
   },
   '/hold-bills/{id}/cancel': {
@@ -421,7 +588,7 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Cancel hold bill',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Cancelled' } },
+      responses: { 200: { description: 'Cancelled' }, ...standardErrors },
     },
   },
   '/payments': {
@@ -429,13 +596,22 @@ export const businessPaths: Record<string, PathItem> = {
       tags: ['Sales'],
       summary: 'List payments',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Payment list' } },
+      parameters: listParams,
+      responses: { 200: { description: 'Payment list' }, ...standardErrors },
     },
     post: {
       tags: ['Sales'],
       summary: 'Create payment for sale or purchase',
       security: [{ bearerAuth: [] }],
-      responses: { 201: { description: 'Payment created' } },
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/CreatePaymentRequest' },
+          },
+        },
+      },
+      responses: { 201: { description: 'Payment created' }, ...standardErrors },
     },
   },
   '/payments/{id}': {
@@ -444,14 +620,16 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get payment',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Payment found' } },
+      responses: { 200: { description: 'Payment found' }, ...standardErrors },
     },
     delete: {
       tags: ['Sales'],
       summary: 'Refund/soft-delete payment',
+      description:
+        'Soft-deletes/refunds a payment record. Full financial reversal of sale/purchase totals is a follow-up hardening item.',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/IdPath' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
   '/receipt-settings': {
@@ -460,20 +638,20 @@ export const businessPaths: Record<string, PathItem> = {
       summary: 'Get receipt settings for branch',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/BranchId' }],
-      responses: { 200: { description: 'Receipt settings' } },
+      responses: { 200: { description: 'Receipt settings' }, ...standardErrors },
     },
     put: {
       tags: ['Settings'],
       summary: 'Upsert receipt settings',
       security: [{ bearerAuth: [] }],
-      responses: { 200: { description: 'Upserted' } },
+      responses: { 200: { description: 'Upserted' }, ...standardErrors },
     },
     delete: {
       tags: ['Settings'],
       summary: 'Soft-delete receipt settings',
       security: [{ bearerAuth: [] }],
       parameters: [{ $ref: '#/components/parameters/BranchId' }],
-      responses: { 200: { description: 'Deleted' } },
+      responses: { 200: { description: 'Deleted' }, ...standardErrors },
     },
   },
 };

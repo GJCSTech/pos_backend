@@ -21,9 +21,9 @@ export const rateLimiter: RequestHandler = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    error: {
+    message: 'Too many requests, please try again later',
+    errors: {
       code: 'RATE_LIMITED',
-      message: 'Too many requests, please try again later',
     },
   },
 });
@@ -35,9 +35,9 @@ export const authRateLimiter: RequestHandler = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    error: {
+    message: 'Too many authentication attempts',
+    errors: {
       code: 'RATE_LIMITED',
-      message: 'Too many authentication attempts',
     },
   },
 });

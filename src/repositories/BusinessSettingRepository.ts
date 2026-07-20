@@ -1,9 +1,10 @@
 import type { BusinessSetting, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { CreateBusinessSettingInput, UpdateBusinessSettingInput, BusinessSettingListQuery } from '../validators/businessSetting.schemas';
 
@@ -48,6 +49,7 @@ export class BusinessSettingRepository implements IBusinessSettingRepository {
     const where: Prisma.BusinessSettingWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),
       ...(search

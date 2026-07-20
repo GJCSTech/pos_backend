@@ -40,9 +40,12 @@ export class InventoryService {
     return { branchId: branchId ?? user.branchId, inventoryValue: value };
   }
 
-  async listLowStock(user: AuthUser, branchId?: string) {
+  async listLowStock(user: AuthUser, query: InventoryListQuery) {
     assertPermission(user, 'inventory.view');
-    return this.inventory.listLowStock(user.companyId, branchId ?? user.branchId);
+    return this.inventory.listLowStock(user.companyId, {
+      ...query,
+      branchId: query.branchId ?? user.branchId,
+    });
   }
 
   async adjustStock(user: AuthUser, input: AdjustStockInput) {
@@ -129,8 +132,14 @@ export class InventoryService {
     });
 
     if (existing) {
-      return db.inventory.update({
-        where: { id: existing.id },
+      // Optimistic concurrency: only update if quantity/version unchanged
+      const updated = await db.inventory.updateMany({
+        where: {
+          id: existing.id,
+          quantity: currentQty,
+          version: existing.version,
+          deletedAt: null,
+        },
         data: {
           quantity: nextQty,
           averageCost,
@@ -140,6 +149,16 @@ export class InventoryService {
           version: { increment: 1 },
         },
       });
+      if (updated.count === 0) {
+        throw conflict('Inventory was modified concurrently; retry the operation');
+      }
+      const row = await db.inventory.findFirst({
+        where: { id: existing.id, companyId: user.companyId, deletedAt: null },
+      });
+      if (!row) {
+        throw notFound('Inventory not found');
+      }
+      return row;
     }
 
     return db.inventory.create({

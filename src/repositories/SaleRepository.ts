@@ -1,9 +1,10 @@
 import type { Prisma, PrismaClient, Sale } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { SaleListQuery } from '../validators/sale.schemas';
 
@@ -59,6 +60,7 @@ export class SaleRepository implements ISaleRepository {
     const where: Prisma.SaleWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.status ? { status: query.status } : {}),

@@ -33,7 +33,7 @@ export class HoldBillController {
     if (!req.user) throw unauthorized();
     const payments = (req.body as { payments: SalePaymentInput[] }).payments ?? [];
     const result = await this.service.resume(req.user, String(req.params.id), payments);
-    res.status(200).json(ok(result));
+    res.status(200).json(ok({ holdBill: result.holdBill, sale: result.sale }, 'Hold bill resumed'));
   };
 
   cancel = async (req: Request, res: Response): Promise<void> => {

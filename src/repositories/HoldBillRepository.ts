@@ -1,9 +1,10 @@
 import type { HoldBill, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { HoldBillListQuery } from '../validators/holdBill.schemas';
 
@@ -58,6 +59,7 @@ export class HoldBillRepository implements IHoldBillRepository {
     const where: Prisma.HoldBillWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.isActive === undefined ? {} : { isActive: query.isActive }),

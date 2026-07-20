@@ -1,9 +1,10 @@
 import type { Payment, Prisma, PrismaClient } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { PaymentListQuery } from '../validators/payment.schemas';
 
@@ -44,6 +45,7 @@ export class PaymentRepository implements IPaymentRepository {
     const where: Prisma.PaymentWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.targetType ? { targetType: query.targetType } : {}),
       ...(query.saleId ? { saleId: query.saleId } : {}),

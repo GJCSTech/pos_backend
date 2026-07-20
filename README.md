@@ -2,7 +2,7 @@
 
 Centralized **Node.js 22 / Express / PostgreSQL 16 / Prisma** API for the VJ Garden Boutique offline-first POS platform.
 
-Version **0.2.0** delivers the enterprise business core (catalog, parties, inventory, purchases, sales, payments, settings) on top of the **0.1.0** multi-tenant foundation. SQLite ↔ PostgreSQL sync remains planned for a later release.
+Version **0.2.1** hardens the **0.2.0** enterprise business core for production-grade React Native POS integration (consistent envelopes, validation, Swagger, sync-friendly list queries). SQLite ↔ PostgreSQL sync remains planned for a later release.
 
 ## Stack
 
@@ -27,7 +27,7 @@ Clean Architecture with DI-friendly wiring:
 Controllers → Services → Repositories → Prisma → PostgreSQL
 ```
 
-Cross-cutting middleware: Helmet, CORS, compression, rate limiting, authentication, authorization, Zod validation, request logging, centralized error handling.
+Cross-cutting middleware: Helmet, CORS, compression, rate limiting, authentication, authorization, Zod validation (body/query/params), request logging, centralized error handling.
 
 ## Prerequisites
 
@@ -104,9 +104,23 @@ npm run dev
 
 **Never** ship these defaults to production. Rotate JWT secrets and admin password before go-live.
 
-## API surface (0.2.0)
+## Response envelope (0.2.1)
 
-Foundation (unchanged from 0.1.0):
+Success:
+
+```json
+{ "success": true, "message": "Success", "data": {}, "meta": { "page": 1, "pageSize": 20, "total": 0, "totalPages": 0, "hasNext": false, "hasPrev": false } }
+```
+
+Failure:
+
+```json
+{ "success": false, "message": "...", "errors": { "code": "VALIDATION_ERROR", "details": {}, "requestId": "uuid" } }
+```
+
+## API surface
+
+Foundation:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -114,12 +128,12 @@ Foundation (unchanged from 0.1.0):
 | `POST` | `/api/v1/auth/login` | No | Issue access + refresh tokens |
 | `POST` | `/api/v1/auth/refresh` | No | Rotate tokens |
 | `POST` | `/api/v1/auth/logout` | No | Revoke refresh token |
-| `GET` | `/api/v1/auth/me` | Bearer | Current user |
+| `GET` | `/api/v1/auth/me` | Bearer | Current user (roles + permissions) |
 | `POST` | `/api/v1/devices/register` | Bearer + `device.register` | Register POS device |
 | `GET` | `/api/v1/devices` | Bearer + `device.view` | List devices |
 | `GET` | `/api/v1/devices/:id` | Bearer + `device.view` | Device detail |
 
-Business core (CRUD + workflows; see Swagger for full query params):
+Business core (CRUD + workflows; see Swagger for full schemas):
 
 | Area | Base paths |
 |------|------------|
@@ -130,7 +144,9 @@ Business core (CRUD + workflows; see Swagger for full query params):
 | Sales | `/sales`, `/sales/:id/complete`, `/hold-bills`, `/hold-bills/:id/resume`, `/payments` |
 | Settings | `/business-settings`, `/receipt-settings` |
 
-List endpoints support `page`, `pageSize`, `search`, `sortBy`, `sortOrder`, and often `branchId` / `isActive`.
+List endpoints support `page`, `pageSize`, `search`, `sortBy`, `sortOrder`, `branchId` / `isActive`, plus mobile sync filters `updatedSince`, `createdFrom`, `createdTo`.
+
+Users / Roles / Permissions are managed via seed data and exposed on `/auth/me` (no dedicated CRUD in 0.2.x).
 
 ### Login example
 
@@ -217,10 +233,10 @@ Every business table includes multi-tenant / audit / sync-ready columns:
 
 ## Related repository docs
 
-- Platform architecture: `../docs/02_ARCHITECTURE.md`
-- Permissions: `../docs/13_PERMISSIONS.md`
-- ADR: `../docs/10_DECISIONS.md` (ADR-032)
-- Backend detail: `./docs/`
+- Backend API: `./docs/API.md`
+- Architecture: `./docs/ARCHITECTURE.md`
+- Release notes: `./docs/RELEASE_0.2.1.md`
+- Changelog: `./CHANGELOG.md`
 
 ## License
 

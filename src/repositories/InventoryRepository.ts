@@ -1,6 +1,7 @@
 import { Prisma, type Inventory, type PrismaClient } from '@prisma/client';
 import {
   buildPageMeta,
+  listDateFilters,
   resolveOrderBy,
   toSkipTake,
   type PaginatedResult,
@@ -19,7 +20,7 @@ export function buildStockKey(
 export interface IInventoryRepository {
   findById(companyId: string, id: string): Promise<(Inventory & { product: { name: string; sku: string; reorderLevel: Prisma.Decimal; minimumStock: Prisma.Decimal; trackInventory: boolean } | null; variant: { name: string; sku: string } | null }) | null>;
   list(companyId: string, query: InventoryListQuery): Promise<PaginatedResult<Inventory>>;
-  listLowStock(companyId: string, branchId: string): Promise<Inventory[]>;
+  listLowStock(companyId: string, query: InventoryListQuery): Promise<PaginatedResult<Inventory>>;
   sumInventoryValue(companyId: string, branchId: string): Promise<Prisma.Decimal>;
   getClient(): PrismaClient;
 }
@@ -57,6 +58,7 @@ export class InventoryRepository implements IInventoryRepository {
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.productId ? { productId: query.productId } : {}),
       ...(query.variantId ? { variantId: query.variantId } : {}),
+      ...listDateFilters(query),
       ...(query.search
         ? {
             OR: [
@@ -87,23 +89,32 @@ export class InventoryRepository implements IInventoryRepository {
     return { items, meta: buildPageMeta(total, query.page, query.pageSize) };
   }
 
-  async listLowStock(companyId: string, branchId: string): Promise<Inventory[]> {
+  async listLowStock(
+    companyId: string,
+    query: InventoryListQuery,
+  ): Promise<PaginatedResult<Inventory>> {
+    const branchId = query.branchId;
     const rows = await this.db.inventory.findMany({
       where: {
         companyId,
-        branchId,
+        ...(branchId ? { branchId } : {}),
         deletedAt: null,
         product: { deletedAt: null, trackInventory: true },
+        ...listDateFilters(query),
       },
       include: { product: true, variant: true },
       orderBy: { quantity: 'asc' },
     });
 
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       const threshold =
         row.product.reorderLevel.gt(0) ? row.product.reorderLevel : row.product.minimumStock;
       return row.quantity.lte(threshold);
     });
+
+    const { skip, take } = toSkipTake(query);
+    const items = filtered.slice(skip, skip + take);
+    return { items, meta: buildPageMeta(filtered.length, query.page, query.pageSize) };
   }
 
   async sumInventoryValue(companyId: string, branchId: string): Promise<Prisma.Decimal> {

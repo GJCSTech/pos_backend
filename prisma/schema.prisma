@@ -1,5 +1,5 @@
 // VJ Garden POS Backend — PostgreSQL schema
-// Release 0.1.0: Foundation | Release 0.2.0: Enterprise Business Core
+// Release 0.1.0: Foundation | 0.2.0: Enterprise Business Core | 0.2.1: Sync indexes
 
 generator client {
   provider = "prisma-client-js"
@@ -548,6 +548,7 @@ model Supplier {
   @@index([companyId, branchId, deletedAt])
   @@index([companyId, isActive])
   @@index([companyId, gstin])
+  @@index([companyId, updatedAt])
   @@map("suppliers")
 }
 
@@ -620,6 +621,7 @@ model Customer {
   @@index([companyId, customerType])
   @@index([companyId, phone])
   @@index([companyId, isActive])
+  @@index([companyId, updatedAt])
   @@map("customers")
 }
 
@@ -684,6 +686,7 @@ model Product {
   @@index([companyId, categoryId])
   @@index([companyId, isActive])
   @@index([companyId, brand])
+  @@index([companyId, updatedAt])
   @@map("products")
 }
 
@@ -788,6 +791,7 @@ model Inventory {
   @@index([companyId, branchId, deletedAt])
   @@index([companyId, productId])
   @@index([companyId, quantity])
+  @@index([companyId, updatedAt])
   @@map("inventories")
 }
 
@@ -894,6 +898,7 @@ model Purchase {
   @@index([companyId, supplierId])
   @@index([companyId, status])
   @@index([companyId, invoiceDate])
+  @@index([companyId, updatedAt])
   @@map("purchases")
 }
 
@@ -1001,6 +1006,7 @@ model Sale {
   @@index([companyId, customerId])
   @@index([companyId, status])
   @@index([companyId, createdAt])
+  @@index([companyId, updatedAt])
   @@map("sales")
 }
 

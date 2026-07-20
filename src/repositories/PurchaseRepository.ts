@@ -1,9 +1,10 @@
 import type { Prisma, PrismaClient, Purchase } from '@prisma/client';
 import {
+  listDateFilters,
   buildPageMeta,
   resolveOrderBy,
   toSkipTake,
-  type PaginatedResult,
+  type PaginatedResult
 } from '../utils/pagination';
 import type { PurchaseListQuery } from '../validators/purchase.schemas';
 
@@ -60,6 +61,7 @@ export class PurchaseRepository implements IPurchaseRepository {
     const where: Prisma.PurchaseWhereInput = {
       companyId,
       deletedAt: null,
+      ...listDateFilters(query),
       ...(query.branchId ? { branchId: query.branchId } : {}),
       ...(query.supplierId ? { supplierId: query.supplierId } : {}),
       ...(query.status ? { status: query.status } : {}),

@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate';
 import { asyncHandler } from '../utils/asyncHandler';
 import { loginSchema, refreshTokenSchema } from '../validators/auth.schemas';
 import { registerDeviceSchema } from '../validators/device.schemas';
+import { idParamSchema, branchIdQuerySchema } from '../validators/common.schemas';
 import { registerBusinessRoutes } from './business';
 
 export function createRoutes(container: AppContainer): Router {
@@ -167,6 +168,7 @@ export function createRoutes(container: AppContainer): Router {
     '/devices',
     authenticate,
     requirePermissions('device.view'),
+    validate(branchIdQuerySchema, 'query'),
     asyncHandler(deviceController.list),
   );
 
@@ -195,6 +197,7 @@ export function createRoutes(container: AppContainer): Router {
     '/devices/:id',
     authenticate,
     requirePermissions('device.view'),
+    validate(idParamSchema, 'params'),
     asyncHandler(deviceController.getById),
   );
 

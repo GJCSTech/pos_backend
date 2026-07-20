@@ -12,7 +12,7 @@ export class AuthController {
       userAgent: req.get('user-agent') ?? undefined,
       ipAddress: req.ip,
     });
-    res.status(200).json(ok(result));
+    res.status(200).json(ok(result, 'Login successful'));
   };
 
   refresh = async (req: Request, res: Response): Promise<void> => {
@@ -21,16 +21,16 @@ export class AuthController {
       userAgent: req.get('user-agent') ?? undefined,
       ipAddress: req.ip,
     });
-    res.status(200).json(ok({ tokens }));
+    res.status(200).json(ok({ tokens }, 'Tokens refreshed'));
   };
 
   logout = async (req: Request, res: Response): Promise<void> => {
     const body = req.body as RefreshTokenInput;
     await this.authService.logout(body.refreshToken);
-    res.status(200).json(ok({ loggedOut: true }));
+    res.status(200).json(ok({ loggedOut: true }, 'Logged out'));
   };
 
   me = async (req: Request, res: Response): Promise<void> => {
-    res.status(200).json(ok({ user: req.user }));
+    res.status(200).json(ok({ user: req.user }, 'Current user'));
   };
 }
