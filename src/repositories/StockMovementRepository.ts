@@ -12,10 +12,15 @@ export interface IStockMovementRepository {
   create(data: Prisma.StockMovementCreateInput): Promise<StockMovement>;
   findById(companyId: string, id: string): Promise<StockMovement | null>;
   list(companyId: string, query: StockMovementListQuery): Promise<PaginatedResult<StockMovement>>;
+  getClient(): PrismaClient;
 }
 
 export class StockMovementRepository implements IStockMovementRepository {
   constructor(private readonly db: PrismaClient) {}
+
+  getClient(): PrismaClient {
+    return this.db;
+  }
 
   create(data: Prisma.StockMovementCreateInput): Promise<StockMovement> {
     return this.db.stockMovement.create({ data });

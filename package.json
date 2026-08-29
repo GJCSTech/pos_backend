@@ -1,6 +1,6 @@
 {
   "name": "@vj-garden/pos-backend",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "VJ Garden POS Backend — hardened enterprise core ready for React Native POS integration",
   "private": true,
   "license": "UNLICENSED",

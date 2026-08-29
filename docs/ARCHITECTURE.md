@@ -57,6 +57,7 @@ Cross-cutting middleware: Helmet, CORS, compression, rate limiting, request IDs,
 - Soft delete (`deletedAt`) + `version` increments on mutation
 - Inventory mutations run inside Prisma transactions with optimistic concurrency on qty updates
 - Purchase receive / sale complete / purchase return complete apply stock movements
+- Cross-service transaction composition (0.3.0): a service that needs to run inside another service's transaction accepts an optional `Prisma.TransactionClient` parameter and, when supplied, executes directly against it instead of opening its own — the same pattern `InventoryService.applyMovement` already used, now also applied to `SaleService.create`/`update`/`complete`/`remove` so `HoldBillService` can compose sale creation/completion/removal and the hold-bill row write into one atomic transaction
 
 ## Sync readiness
 

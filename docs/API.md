@@ -105,4 +105,12 @@ All business routes require `Authorization: Bearer <accessToken>` and matching `
 - On `errors.code = CONFLICT` for inventory, retry once after refresh.
 - Soft-deleted rows set `deletedAt`; list endpoints exclude them by default.
 
+### Payments (0.3.0)
+
+`DELETE /payments/:id` voids the payment transactionally: it reverses `Sale.paidAmount` or (`Purchase.paidAmount` + `Supplier.outstandingBalance`) by the payment's amount, then marks the payment `REFUNDED`. Voiding an already-voided payment returns `409 CONFLICT`; voiding a missing/already-gone payment returns `404 NOT FOUND` as usual.
+
+### Stock movements (0.3.0)
+
+`POST /stock-movements` persists `movementType`, `referenceType`, `referenceId`, and `occurredAt` exactly as submitted (previously always recorded as a generic `ADJUSTMENT` with no reference — this was a bug, now fixed). Quantity sign is validated per `movementType`: `PURCHASE`, `SALE_RETURN`, `TRANSFER_IN`, and `OPENING` require a positive quantity; `SALE`, `PURCHASE_RETURN`, and `TRANSFER_OUT` require a negative quantity; `ADJUSTMENT` is unconstrained. `POST /inventories/adjust` is unaffected and always records `ADJUSTMENT`.
+
 Full request/response examples: open Swagger at `/docs`.

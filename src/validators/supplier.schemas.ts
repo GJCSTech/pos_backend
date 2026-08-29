@@ -22,7 +22,9 @@ export const createSupplierSchema = z.object({
   branchId: z.string().uuid().optional(),
 });
 
-export const updateSupplierSchema = createSupplierSchema.partial();
+export const updateSupplierSchema = createSupplierSchema
+  .omit({ outstandingBalance: true })
+  .partial();
 
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;

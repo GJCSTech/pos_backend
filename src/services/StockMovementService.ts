@@ -33,14 +33,21 @@ export class StockMovementService {
 
   async create(user: AuthUser, input: CreateStockMovementInput) {
     assertPermission(user, 'inventory.manage');
-    return this.inventoryService.adjustStock(user, {
-      productId: input.productId,
-      variantId: input.variantId,
-      quantity: input.quantity,
-      unitCost: input.unitCost,
-      batchNumber: input.batchNumber,
-      serialNumber: input.serialNumber,
-      notes: input.notes,
-    });
+    const db = this.movements.getClient();
+    return db.$transaction((tx) =>
+      this.inventoryService.applyMovement(tx, user, {
+        productId: input.productId,
+        variantId: input.variantId,
+        quantity: input.quantity,
+        unitCost: input.unitCost,
+        batchNumber: input.batchNumber,
+        serialNumber: input.serialNumber,
+        notes: input.notes,
+        movementType: input.movementType,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        occurredAt: input.occurredAt,
+      }),
+    );
   }
 }

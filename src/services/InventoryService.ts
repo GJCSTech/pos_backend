@@ -68,6 +68,7 @@ export class InventoryService {
       referenceType?: string;
       referenceId?: string;
       branchId?: string;
+      occurredAt?: Date;
     },
   ) {
     const branchId = input.branchId ?? user.branchId;
@@ -126,6 +127,7 @@ export class InventoryService {
         batchNumber: input.batchNumber ?? null,
         serialNumber: input.serialNumber ?? null,
         notes: input.notes,
+        ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
         createdBy: user.id,
         updatedBy: user.id,
       },

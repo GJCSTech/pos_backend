@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type SaleStatus } from '@prisma/client';
 import { conflict, notFound, validationError } from '../errors/AppError';
 import type { ISaleRepository } from '../repositories/SaleRepository';
 import type { InventoryService } from './InventoryService';
@@ -85,7 +85,11 @@ export class SaleService {
     return sale;
   }
 
-  async create(user: AuthUser, input: CreateSaleInput) {
+  async create(
+    user: AuthUser,
+    input: CreateSaleInput,
+    externalTx?: Prisma.TransactionClient,
+  ) {
     assertPermission(user, 'sales.manage');
     const mappedItems = mapItems(input.items, user);
     const header = sumHeader(mappedItems);
@@ -102,9 +106,27 @@ export class SaleService {
       throw validationError('Paid amount is less than sale total');
     }
 
+    const run = (tx: Prisma.TransactionClient) =>
+      this.createWithinTx(tx, user, input, mappedItems, header, status, paidAmount);
+
+    if (externalTx) {
+      return run(externalTx);
+    }
     const db = this.sales.getClient();
-    return db.$transaction(async (tx) => {
-      const sale = await tx.sale.create({
+    return db.$transaction(run);
+  }
+
+  private async createWithinTx(
+    tx: Prisma.TransactionClient,
+    user: AuthUser,
+    input: CreateSaleInput,
+    mappedItems: ReturnType<typeof mapItems>,
+    header: ReturnType<typeof sumHeader>,
+    status: SaleStatus,
+    paidAmount: Prisma.Decimal,
+  ) {
+    const payments = input.payments ?? [];
+    const sale = await tx.sale.create({
         data: {
           companyId: user.companyId,
           branchId: user.branchId,
@@ -142,15 +164,19 @@ export class SaleService {
         },
       });
 
-      if (status === 'COMPLETED') {
-        await this.deductStock(tx, user, sale.id, input.items);
-      }
+    if (status === 'COMPLETED') {
+      await this.deductStock(tx, user, sale.id, input.items);
+    }
 
-      return sale;
-    });
+    return sale;
   }
 
-  async update(user: AuthUser, id: string, input: UpdateSaleInput) {
+  async update(
+    user: AuthUser,
+    id: string,
+    input: UpdateSaleInput,
+    externalTx?: Prisma.TransactionClient,
+  ) {
     assertPermission(user, 'sales.manage');
     const existing = await this.getById(user, id);
     if (existing.status === 'COMPLETED' || existing.status === 'CANCELLED') {
@@ -177,92 +203,142 @@ export class SaleService {
       }
     }
 
+    const run = (tx: Prisma.TransactionClient) =>
+      this.updateWithinTx(tx, user, id, input, existing, mappedItems, header, nextStatus, payments, paidAmount);
+
+    if (externalTx) {
+      return run(externalTx);
+    }
     const db = this.sales.getClient();
-    return db.$transaction(async (tx) => {
-      if (mappedItems) {
-        await tx.saleItem.updateMany({
-          where: { saleId: id, deletedAt: null },
-          data: { deletedAt: new Date(), updatedBy: user.id, version: { increment: 1 } },
-        });
-      }
+    return db.$transaction(run);
+  }
 
-      if (payments) {
-        await tx.payment.updateMany({
-          where: { saleId: id, deletedAt: null },
-          data: { deletedAt: new Date(), updatedBy: user.id, version: { increment: 1 } },
-        });
-      }
+  private async updateWithinTx(
+    tx: Prisma.TransactionClient,
+    user: AuthUser,
+    id: string,
+    input: UpdateSaleInput,
+    existing: Awaited<ReturnType<SaleService['getById']>>,
+    mappedItems: ReturnType<typeof mapItems> | null,
+    header: ReturnType<typeof sumHeader> | null,
+    nextStatus: SaleStatus,
+    payments: SalePaymentInput[] | undefined,
+    paidAmount: Prisma.Decimal,
+  ) {
+    if (mappedItems) {
+      await tx.saleItem.updateMany({
+        where: { saleId: id, deletedAt: null },
+        data: { deletedAt: new Date(), updatedBy: user.id, version: { increment: 1 } },
+      });
+    }
 
-      const sale = await tx.sale.update({
+    if (payments) {
+      await tx.payment.updateMany({
+        where: { saleId: id, deletedAt: null },
+        data: { deletedAt: new Date(), updatedBy: user.id, version: { increment: 1 } },
+      });
+    }
+
+    const sale = await tx.sale.update({
+      where: { id },
+      data: {
+        ...(input.customerId !== undefined ? { customerId: input.customerId } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.billNumber ? { billNumber: input.billNumber } : {}),
+        status: nextStatus,
+        paidAmount,
+        ...(header
+          ? {
+              subtotal: header.subtotal,
+              discountAmount: header.discountAmount,
+              taxAmount: header.taxAmount,
+              totalAmount: header.totalAmount,
+            }
+          : {}),
+        heldAt: nextStatus === 'HELD' ? new Date() : existing.heldAt,
+        completedAt: nextStatus === 'COMPLETED' ? new Date() : existing.completedAt,
+        updatedBy: user.id,
+        version: { increment: 1 },
+        ...(mappedItems
+          ? {
+              items: {
+                create: mappedItems,
+              },
+            }
+          : {}),
+        ...(payments
+          ? {
+              payments: {
+                create: payments.map((payment) =>
+                  this.toPaymentCreate(user, payment, 'SALE'),
+                ),
+              },
+            }
+          : {}),
+      },
+      include: {
+        items: { where: { deletedAt: null } },
+        payments: { where: { deletedAt: null } },
+        customer: true,
+        holdBill: true,
+      },
+    });
+
+    if (existing.status !== 'COMPLETED' && nextStatus === 'COMPLETED') {
+      const sourceItems =
+        input.items ??
+        sale.items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+        }));
+      await this.deductStock(tx, user, sale.id, sourceItems);
+    }
+
+    return sale;
+  }
+
+  async complete(
+    user: AuthUser,
+    id: string,
+    payments?: SalePaymentInput[],
+    externalTx?: Prisma.TransactionClient,
+  ) {
+    return this.update(
+      user,
+      id,
+      {
+        status: 'COMPLETED',
+        ...(payments ? { payments } : {}),
+      },
+      externalTx,
+    );
+  }
+
+  async remove(user: AuthUser, id: string, externalTx?: Prisma.TransactionClient) {
+    assertPermission(user, 'sales.manage');
+    if (externalTx) {
+      const existing = await externalTx.sale.findFirst({
+        where: { id, companyId: user.companyId, deletedAt: null },
+      });
+      if (!existing) {
+        throw notFound('Sale not found');
+      }
+      if (existing.status === 'COMPLETED') {
+        throw conflict('Completed sales cannot be deleted');
+      }
+      return externalTx.sale.update({
         where: { id },
         data: {
-          ...(input.customerId !== undefined ? { customerId: input.customerId } : {}),
-          ...(input.notes !== undefined ? { notes: input.notes } : {}),
-          ...(input.billNumber ? { billNumber: input.billNumber } : {}),
-          status: nextStatus,
-          paidAmount,
-          ...(header
-            ? {
-                subtotal: header.subtotal,
-                discountAmount: header.discountAmount,
-                taxAmount: header.taxAmount,
-                totalAmount: header.totalAmount,
-              }
-            : {}),
-          heldAt: nextStatus === 'HELD' ? new Date() : existing.heldAt,
-          completedAt: nextStatus === 'COMPLETED' ? new Date() : existing.completedAt,
+          deletedAt: new Date(),
+          status: 'CANCELLED',
           updatedBy: user.id,
           version: { increment: 1 },
-          ...(mappedItems
-            ? {
-                items: {
-                  create: mappedItems,
-                },
-              }
-            : {}),
-          ...(payments
-            ? {
-                payments: {
-                  create: payments.map((payment) =>
-                    this.toPaymentCreate(user, payment, 'SALE'),
-                  ),
-                },
-              }
-            : {}),
-        },
-        include: {
-          items: { where: { deletedAt: null } },
-          payments: { where: { deletedAt: null } },
-          customer: true,
-          holdBill: true,
         },
       });
+    }
 
-      if (existing.status !== 'COMPLETED' && nextStatus === 'COMPLETED') {
-        const sourceItems =
-          input.items ??
-          sale.items.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            quantity: Number(item.quantity),
-            unitPrice: Number(item.unitPrice),
-          }));
-        await this.deductStock(tx, user, sale.id, sourceItems);
-      }
-
-      return sale;
-    });
-  }
-
-  async complete(user: AuthUser, id: string, payments?: SalePaymentInput[]) {
-    return this.update(user, id, {
-      status: 'COMPLETED',
-      ...(payments ? { payments } : {}),
-    });
-  }
-
-  async remove(user: AuthUser, id: string) {
-    assertPermission(user, 'sales.manage');
     const existing = await this.getById(user, id);
     if (existing.status === 'COMPLETED') {
       throw conflict('Completed sales cannot be deleted');

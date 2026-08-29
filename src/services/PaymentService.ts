@@ -1,4 +1,4 @@
-import { notFound, validationError } from '../errors/AppError';
+import { conflict, notFound, validationError } from '../errors/AppError';
 import type { IPaymentRepository } from '../repositories/PaymentRepository';
 import type { AuthUser } from '../types/auth';
 import { roundMoney, toDecimal } from '../utils/money';
@@ -125,7 +125,75 @@ export class PaymentService {
 
   async remove(user: AuthUser, id: string) {
     assertPermission(user, 'sales.manage');
-    const existing = await this.getById(user, id);
-    return this.payments.softDelete(existing.id, user.id);
+    const db = this.payments.getClient();
+
+    return db.$transaction(async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { id, companyId: user.companyId, deletedAt: null },
+      });
+      if (!payment) {
+        throw notFound('Payment not found');
+      }
+      if (payment.status === 'REFUNDED') {
+        throw conflict('Payment is already voided');
+      }
+
+      if (payment.targetType === 'SALE') {
+        if (!payment.saleId) {
+          throw validationError('Payment is missing saleId');
+        }
+        const sale = await tx.sale.findFirst({
+          where: { id: payment.saleId, companyId: user.companyId, deletedAt: null },
+        });
+        if (!sale) {
+          throw notFound('Sale not found');
+        }
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: {
+            paidAmount: roundMoney(toDecimal(sale.paidAmount).sub(payment.amount)),
+            updatedBy: user.id,
+            version: { increment: 1 },
+          },
+        });
+      } else {
+        if (!payment.purchaseId) {
+          throw validationError('Payment is missing purchaseId');
+        }
+        const purchase = await tx.purchase.findFirst({
+          where: { id: payment.purchaseId, companyId: user.companyId, deletedAt: null },
+        });
+        if (!purchase) {
+          throw notFound('Purchase not found');
+        }
+        await tx.purchase.update({
+          where: { id: purchase.id },
+          data: {
+            paidAmount: roundMoney(toDecimal(purchase.paidAmount).sub(payment.amount)),
+            updatedBy: user.id,
+            version: { increment: 1 },
+          },
+        });
+        await tx.supplier.update({
+          where: { id: purchase.supplierId },
+          data: {
+            outstandingBalance: { increment: payment.amount },
+            updatedBy: user.id,
+            version: { increment: 1 },
+          },
+        });
+      }
+
+      return tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          deletedAt: new Date(),
+          status: 'REFUNDED',
+          updatedBy: user.id,
+          version: { increment: 1 },
+        },
+        include: { sale: true, purchase: true },
+      });
+    });
   }
 }

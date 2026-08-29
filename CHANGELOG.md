@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-29
+
+### Added
+
+- Transactional payment void: `DELETE /payments/:id` reverses `Sale.paidAmount` / `Purchase.paidAmount` / `Supplier.outstandingBalance` before marking the payment `REFUNDED`
+- Quantity-sign-by-`movementType` validation on `POST /stock-movements`
+- `SaleService.create`/`update`/`complete`/`remove` accept an optional external transaction client for composition by other services
+- Unit tests: `PaymentService`, `StockMovementService`, `HoldBillService`, `customer.schemas`, `supplier.schemas`, `stockMovement.schemas`; extended `SaleService` tests
+- Release notes: `docs/RELEASE_0.3.0.md`
+
+### Changed
+
+- Package version bumped to `0.3.0`
+- `POST /stock-movements` now persists the caller's actual `movementType`, `referenceType`, `referenceId`, and `occurredAt` instead of always recording `ADJUSTMENT`
+- `PATCH /customers/:id` and `PATCH /suppliers/:id` no longer accept `outstandingBalance` (customers also: `loyaltyPoints`)
+- `HoldBillService.create`/`resume`/`cancel` now run the sale-side operation and the hold-bill-row write inside a single transaction
+
+### Fixed
+
+- `DELETE /payments/:id` no longer leaves `Sale`/`Purchase`/`Supplier` financial totals inconsistent after voiding a payment
+- Hold-bill create/resume/cancel can no longer leave an orphaned sale or an inconsistent hold-bill row after a crash or error partway through
+
 ## [0.2.1] - 2026-07-19
 
 ### Added

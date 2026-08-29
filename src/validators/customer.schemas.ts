@@ -25,7 +25,9 @@ export const createCustomerSchema = z.object({
   branchId: z.string().uuid().optional(),
 });
 
-export const updateCustomerSchema = createCustomerSchema.partial();
+export const updateCustomerSchema = createCustomerSchema
+  .omit({ outstandingBalance: true, loyaltyPoints: true })
+  .partial();
 
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
